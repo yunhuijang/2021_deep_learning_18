@@ -43,8 +43,8 @@ def prepare_parser():
     parser.add_argument('--seed', default=2021, type=int, help='Random seed to reproduce prediction result')
 
     # Directories
-    parser.add_argument('--train_data', default='train_final.csv', type=str, help='XXX')
-    parser.add_argument('--test_data', default='eval_final_open.csv', type=str, help='XXX')
+    parser.add_argument('--train_data', default='train_final_clean.csv', type=str, help='XXX')
+    parser.add_argument('--test_data', default='eval_final_clean.csv', type=str, help='XXX')
     parser.add_argument('--datadir', default='./dataset', type=str, help='XXX')
     parser.add_argument('--outdir', default='./models', type=str, help='XXX')
     parser.add_argument('--submitdir', default='./submissions', type=str, help='XXX')
@@ -84,7 +84,8 @@ def train_fn(model, iterator, optimizer, criterion):
     epoch_acc = 0
     
     model.train()
-    
+    print(f'TRAIN: The model has {count_parameters(model):,} trainable parameters')
+
     for batch in iterator:
         
         optimizer.zero_grad()
@@ -113,7 +114,7 @@ def eval_fn(model, iterator, criterion):
     epoch_acc = 0
     
     model.eval()
-    
+    print(f'EVAL: The model has {count_parameters(model):,} trainable parameters')
     with torch.no_grad():
     
         for batch in iterator:
@@ -184,11 +185,12 @@ def run(config):
 
     LABEL = data.Field(sequential=False, use_vocab=False)
 
-    train = pd.read_csv(os.path.join(config['datadir'], config['train_data']))
-    test = pd.read_csv(os.path.join(config['datadir'], config['test_data']))
-    train, valid = train_test_split(train, test_size=0.2)
-    train.to_csv(os.path.join(config['datadir'],'temp_train.csv'), index=False)
-    valid.to_csv(os.path.join(config['datadir'],'temp_val.csv'), index=False)
+    
+    # train = pd.read_csv(os.path.join(config['datadir'], config['train_data']))
+    # test = pd.read_csv(os.path.join(config['datadir'], config['test_data']))
+    # train, valid = train_test_split(train, test_size=0.2)
+    # train.to_csv(os.path.join(config['datadir'],'temp_train.csv'), index=False)
+    # valid.to_csv(os.path.join(config['datadir'],'temp_val.csv'), index=False)
 
     train, valid = data.TabularDataset.splits(path=config['datadir'], train='temp_train.csv', validation='temp_val.csv', 
                                               format='csv', skip_header=True,
@@ -266,8 +268,8 @@ def run(config):
         
 
     best_epoch = 0
-    # best_valid_loss = float('inf')
-    best_valid_acc = 0.0
+    best_valid_loss = float('inf')
+    # best_valid_acc = 0.0
 
     for epoch in range(config['gru_ep']):
         
@@ -280,15 +282,15 @@ def run(config):
             
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
             
-        # if valid_loss < best_valid_loss:
-        #     best_epoch = epoch + 1
-        #     best_valid_loss = valid_loss
-        #     torch.save(model.state_dict(), os.path.join(config['outdir'],model_name))
-        
-        if valid_acc > best_valid_acc:
+        if valid_loss < best_valid_loss:
             best_epoch = epoch + 1
-            best_valid_acc = valid_acc
+            best_valid_loss = valid_loss
             torch.save(model.state_dict(), os.path.join(config['outdir'],model_name))
+        
+        # if valid_acc > best_valid_acc:
+        #     best_epoch = epoch + 1
+        #     best_valid_acc = valid_acc
+        #     torch.save(model.state_dict(), os.path.join(config['outdir'],model_name))
 
         print(f'Epoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
         print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')

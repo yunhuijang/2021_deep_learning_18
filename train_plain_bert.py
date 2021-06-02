@@ -49,8 +49,8 @@ def prepare_parser():
     parser.add_argument('--seed', default=2021, type=int, help='Random seed to reproduce prediction result')
 
     # Directories
-    parser.add_argument('--train_data', default='train_final.csv', type=str, help='XXX')
-    parser.add_argument('--test_data', default='eval_final_open.csv', type=str, help='XXX')
+    parser.add_argument('--train_data', default='train_final_clean.csv', type=str, help='XXX')
+    parser.add_argument('--test_data', default='eval_final_clean.csv', type=str, help='XXX')
     parser.add_argument('--datadir', default='./dataset', type=str, help='XXX')
     parser.add_argument('--outdir', default='./models', type=str, help='XXX')
     parser.add_argument('--submitdir', default='./submissions', type=str, help='XXX')

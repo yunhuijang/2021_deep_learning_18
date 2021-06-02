@@ -133,5 +133,6 @@ dataset/*
 models/*
 out/*
 submissions/*
+submissions2/*
 .vscode/*
 scripts/*

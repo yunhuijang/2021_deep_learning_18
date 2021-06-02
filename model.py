@@ -33,7 +33,7 @@ class GRUBERT(nn.Module):
 
     def forward(self, text):
         # text = [batch size, sent len]
-
+        
         if self.config['gru_only']:
             with torch.no_grad():
                 embedding = self.bert(text)[0]  # embedding = [batch size, sent len, emb dim]
@@ -49,7 +49,8 @@ class GRUBERT(nn.Module):
         
         _, hidden1 = self.gru13(output1)  # hidden1 = [1, batch size, 128]
 
-        reversed_embedding = torch.from_numpy(embedding.detach().cpu().numpy()[:, ::-1, :].copy()).to(self.DEVICE)
+        # reversed_embedding = torch.from_numpy(embedding.detach().cpu().numpy()[:, ::-1, :].copy()).to(self.DEVICE)
+        reversed_embedding = torch.flip(embedding, dims=[1])
         
         output2, _ = self.gru21(reversed_embedding)
         output2 = self.dropout1(output2)  # output2 = [batch size, sent len, 512]
