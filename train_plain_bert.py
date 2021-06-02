@@ -14,7 +14,7 @@ from torchtext import data, datasets
 
 from transformers import BertTokenizer, BertModel
 from transformers import DistilBertTokenizer, DistilBertModel
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 from model import GRUBERT, GRUBERT2, LSTMBERT
 
@@ -22,6 +22,12 @@ ID_COL = 'Id'
 TARGET_COL = 'Category'
 SOURCE_COL = 'Sentence'
 
+embedding_dim = {
+    'bert-base-cased': 'hidden_size',
+    'bert-base-uncased': 'hidden_size',
+    'distilbert-base-cased': 'dim',
+    'distilbert-base-uncased': 'dim',
+}
 
 
 
@@ -29,15 +35,15 @@ def prepare_parser():
     parser = argparse.ArgumentParser(description='DistilBERT with Bi-GRU')
     # Hyperparam
     parser.add_argument('--bert_ep', default=20, type=int, help='Number of epochs for BERT training')
-    parser.add_argument('--gru_ep', default=20, type=int, help='Number of epochs for GRU training')
+    # parser.add_argument('--gru_ep', default=20, type=int, help='Number of epochs for GRU training')
     parser.add_argument('--bs', default=256, type=int, help='Batch size')
     parser.add_argument('--bert_lr', default=1e-5, type=float, help='Bert learning rate')
-    parser.add_argument('--gru_lr', default=1e-3, type=float, help='GRU learning rate')
+    # parser.add_argument('--gru_lr', default=1e-3, type=float, help='GRU learning rate')
 
     # Model Selection
     parser.add_argument('--out_dim', default=5, type=int, help='Dimension of output label')
     parser.add_argument('--pretrained_model', default='distilbert-base-cased', type=str, help='Pretrained model for sentence classification')
-    parser.add_argument('--gru_only', action='store_true', help='Train only GRU')
+    # parser.add_argument('--only_gru', action='store_true', help='Train only GRU')
 
     # Randomness
     parser.add_argument('--seed', default=2021, type=int, help='Random seed to reproduce prediction result')
@@ -64,8 +70,6 @@ def seed_all(seed_value):
         torch.cuda.manual_seed_all(seed_value)
         # torch.backends.cudnn.deterministic = True
         # torch.backends.cudnn.benchmark = False
-
-
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -94,9 +98,9 @@ def train_fn(model, iterator, optimizer, criterion):
         
         prediction = model(data)
         
-        loss = criterion(prediction, label)
+        loss = criterion(prediction.logits, label)
         
-        acc = accuracy(prediction, label)
+        acc = accuracy(prediction.logits, label)
         
         loss.backward()
         
@@ -123,9 +127,9 @@ def eval_fn(model, iterator, criterion):
             
             prediction = model(data)
             
-            loss = criterion(prediction, label)
+            loss = criterion(prediction.logits, label)
             
-            acc = accuracy(prediction, label)
+            acc = accuracy(prediction.logits, label)
 
             epoch_loss += loss.item()
             epoch_acc += acc.item()
@@ -152,7 +156,7 @@ def predict(model, iterator):
             
             prediction = model(data)
             
-            prediction = torch.argmax(nn.functional.softmax(prediction, dim=1), dim=1)
+            prediction = torch.argmax(nn.functional.softmax(prediction.logits, dim=1), dim=1)
             
             predictions.extend(prediction.tolist())
         
@@ -166,6 +170,13 @@ def run(config):
     print("Currently running on:", device)
 
     tokenizer = AutoTokenizer.from_pretrained(config['pretrained_model'])
+    model = AutoModelForSequenceClassification.from_pretrained(config['pretrained_model'])
+    # if config['pretrained_model'].startswith('distilbert'):
+    #     tokenizer = DistilBertTokenizer.from_pretrained(config['pretrained_model'])
+    #     bert = DistilBertModel.from_pretrained(config['pretrained_model'])
+    # elif config['pretrained_model'].startswith('bert'):
+    #     tokenizer = BertTokenizer.from_pretrained(config['pretrained_model'])
+    #     bert = BertModel.from_pretrained(config['pretrained_model'])
 
     def tokenize_and_cut(sentence):
         tokens = tokenizer.tokenize(sentence)
@@ -184,11 +195,11 @@ def run(config):
 
     LABEL = data.Field(sequential=False, use_vocab=False)
 
-    train = pd.read_csv(os.path.join(config['datadir'], config['train_data']))
-    test = pd.read_csv(os.path.join(config['datadir'], config['test_data']))
-    train, valid = train_test_split(train, test_size=0.2)
-    train.to_csv(os.path.join(config['datadir'],'temp_train.csv'), index=False)
-    valid.to_csv(os.path.join(config['datadir'],'temp_val.csv'), index=False)
+    # train = pd.read_csv(os.path.join(config['datadir'], config['train_data']))
+    # test = pd.read_csv(os.path.join(config['datadir'], config['test_data']))
+    # train, valid = train_test_split(train, test_size=0.2)
+    # train.to_csv(os.path.join(config['datadir'],'temp_train.csv'), index=False)
+    # valid.to_csv(os.path.join(config['datadir'],'temp_val.csv'), index=False)
 
     train, valid = data.TabularDataset.splits(path=config['datadir'], train='temp_train.csv', validation='temp_val.csv', 
                                               format='csv', skip_header=True,
@@ -215,47 +226,12 @@ def run(config):
         print(category.shape)
         print(category)
 
-
-    if config['gru_only']:
-        model_name = f"model_{config['pretrained_model']}_gru_lr{config['gru_lr']}_bs{config['bs']}_ep{config['gru_ep']}.pt"
-        model_fullname = f"model_full_{config['pretrained_model']}_gru_lr{config['gru_lr']}_bs{config['bs']}_ep{config['gru_ep']}.pt"
-        submission_name = f"submission_{config['pretrained_model']}_gru_lr{config['gru_lr']}_bs{config['bs']}_ep{config['gru_ep']}.csv"
-    else:
-        model_name = f"model_{config['pretrained_model']}_bert_lr{config['bert_lr']}_gru_lr{config['gru_lr']}_bs{config['bs']}_ep{config['gru_ep']}.pt"
-        model_fullname = f"model_full_{config['pretrained_model']}_bert_lr{config['bert_lr']}_gru_lr{config['gru_lr']}_bs{config['bs']}_ep{config['gru_ep']}.pt"
-        submission_name = f"submission_{config['pretrained_model']}_bert_lr{config['bert_lr']}_gru_lr{config['gru_lr']}_bs{config['bs']}_ep{config['gru_ep']}.csv"
-
-
-    bert = AutoModel.from_pretrained(config['pretrained_model'])
-    model = GRUBERT(bert=bert, config=config).to(device)
-
-    if config['gru_only']:
-
-        for name, param in model.named_parameters(): 
-            if name.startswith('bert'):
-                param.requires_grad = False # Lock BERT
-            else:
-                param.requires_grad = True
-        
-        optimizer = optim.AdamW(model.parameters(), lr=config['gru_lr'])
-        criterion = nn.CrossEntropyLoss().to(device)
     
-    else:
+    model_name = f"model_{config['pretrained_model']}_bert_lr{config['bert_lr']}_bs{config['bs']}_bert_ep{config['bert_ep']}.pt"
+    submission_name = f"submission_{config['pretrained_model']}_bert_lr{config['bert_lr']}_bs{config['bs']}_bert_ep{config['bert_ep']}.csv"
 
-        param_bert = []
-        param_gru = []
-
-        for name, param in model.named_parameters(): 
-            if name.startswith('bert'):
-                param.requires_grad = True # Open BERT
-                param_bert.append(param)
-            else:
-                param.requires_grad = True
-                param_gru.append(param)
-
-        optimizer = optim.AdamW([{'params': param_bert, 'lr': config['bert_lr']}, {'params': param_gru, 'lr': config['gru_lr']}])
-        criterion = nn.CrossEntropyLoss().to(device)
-
+    model.to(device)
+    model.train()
 
     if config['debug']:
         print(f'The model has {count_parameters(model):,} trainable parameters')
@@ -263,13 +239,14 @@ def run(config):
             if param.requires_grad:
                 print(name)
 
-        
+    optimizer = optim.AdamW(model.parameters(), lr=config['bert_lr'])
+    # optimizer = optim.AdamW([{'params': param_bert, 'lr': config['bert_lr']}, {'params': param_gru, 'lr': config['gru_lr']}])
+    criterion = nn.CrossEntropyLoss().to(device)
 
     best_epoch = 0
-    # best_valid_loss = float('inf')
-    best_valid_acc = 0.0
+    best_valid_loss = float('inf')
 
-    for epoch in range(config['gru_ep']):
+    for epoch in range(config['bert_ep']):
         
         start_time = time.time()
         
@@ -280,19 +257,18 @@ def run(config):
             
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
             
-        # if valid_loss < best_valid_loss:
-        #     best_epoch = epoch + 1
-        #     best_valid_loss = valid_loss
-        #     torch.save(model.state_dict(), os.path.join(config['outdir'],model_name))
-        
-        if valid_acc > best_valid_acc:
+        if valid_loss < best_valid_loss:
             best_epoch = epoch + 1
-            best_valid_acc = valid_acc
+            best_valid_loss = valid_loss
             torch.save(model.state_dict(), os.path.join(config['outdir'],model_name))
-
+        
         print(f'Epoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
         print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')
         print(f'\t Val. Loss: {valid_loss:.3f} |  Val. Acc: {valid_acc*100:.2f}%')
+
+    # best_state_dict = torch.load(os.path.join(config['outdir'],model_name))
+    # model.load_state_dict(best_state_dict)
+    # model = model.to(device)
 
 
     train_full = data.TabularDataset(os.path.join(config['datadir'], config['train_data']), format='csv', skip_header=True,
@@ -300,35 +276,9 @@ def run(config):
     train_full_iter = data.BucketIterator(train_full, batch_size=config['bs'], shuffle=True, device=device)
 
     
-    bert = AutoModel.from_pretrained(config['pretrained_model'])
-    model = GRUBERT(bert=bert, config=config).to(device)
-
-    if config['gru_only']:
-
-        for name, param in model.named_parameters(): 
-            if name.startswith('bert'):
-                param.requires_grad = False # Lock BERT
-            else:
-                param.requires_grad = True
-        
-        optimizer = optim.AdamW(model.parameters(), lr=config['gru_lr'])
-        criterion = nn.CrossEntropyLoss().to(device)
-    
-    else:
-
-        param_bert = []
-        param_gru = []
-        
-        for name, param in model.named_parameters(): 
-            if name.startswith('bert'):
-                param.requires_grad = True # Open BERT
-                param_bert.append(param)
-            else:
-                param.requires_grad = True
-                param_gru.append(param)
-
-        optimizer = optim.AdamW([{'params': param_bert, 'lr': config['bert_lr']}, {'params': param_gru, 'lr': config['gru_lr']}])
-        criterion = nn.CrossEntropyLoss().to(device)
+    model = AutoModelForSequenceClassification.from_pretrained(config['pretrained_model'])
+    model.to(device)
+    model.train()
     
     for epoch in range(best_epoch + 1):
         
@@ -341,11 +291,14 @@ def run(config):
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
             
         if epoch == best_epoch:
-            torch.save(model.state_dict(), os.path.join(config['outdir'], model_fullname))
+            torch.save(model.state_dict(), os.path.join(config['outdir'], f"model_full_{config['pretrained_model']}_bert_lr{config['bert_lr']}_bs{config['bs']}_bert_ep{config['bert_ep']}.pt"))
         
         print(f'Epoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
         print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')
 
+    # best_state_dict = torch.load(os.path.join(config['outdir'],model_name))
+    # model.load_state_dict(best_state_dict)
+    # model = model.to(device)
 
     model.eval()
     predictions = predict(model, test_iter)

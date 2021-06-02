@@ -134,3 +134,4 @@ models/*
 out/*
 submissions/*
 .vscode/*
+scripts/*
