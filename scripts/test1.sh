@@ -51,14 +51,13 @@ bs=256
 
 
 export CUDA_VISIBLE_DEVICES=0
-python train.py --gru_ep 20 --gru_lr 3e-3 --bs $bs --pretrained_model $model --gru_only &
-sleep 30
+python train.py --gru_ep 30 --gru_lr 3e-3 --bs $bs --pretrained_model $model --gru_only
+
 export CUDA_VISIBLE_DEVICES=1
-python train.py --gru_ep 200 --gru_lr 3e-3 --bs $bs --pretrained_model $model --gru_only &
-sleep 30
+python train.py --gru_ep 30 --gru_lr 3e-3 --bs $bs --pretrained_model $model --gru_only
+
 export CUDA_VISIBLE_DEVICES=2
-python train.py --gru_ep 20 --gru_lr 3e-3 --bert_lr 3e-5 --bs $bs --pretrained_model $model &
-sleep 30
+python train.py --gru_ep 20 --gru_lr 3e-3 --bert_lr 3e-5 --bs $bs --pretrained_model $model
+
 export CUDA_VISIBLE_DEVICES=3
-python train.py --gru_ep 200 --gru_lr 3e-3 --bert_lr 3e-5 --bs $bs --pretrained_model $model &
-wait
+python train.py --gru_ep 200 --gru_lr 3e-3 --bert_lr 3e-5 --bs $bs --pretrained_model $model
