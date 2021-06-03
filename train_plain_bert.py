@@ -14,9 +14,9 @@ from torchtext import data, datasets
 
 from transformers import BertTokenizer, BertModel
 from transformers import DistilBertTokenizer, DistilBertModel
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel
 
-from model import GRUBERT, GRUBERT2, LSTMBERT
+from model import GRUBERT, GRUBERT2, LSTMBERT, BERTClassifier
 
 ID_COL = 'Id'
 TARGET_COL = 'Category'
@@ -169,8 +169,12 @@ def run(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Currently running on:", device)
 
+    # tokenizer = AutoTokenizer.from_pretrained("nlptown/bert-base-multilingual-uncased-sentiment")
+    # model = AutoModelForSequenceClassification.from_pretrained("nlptown/bert-base-multilingual-uncased-sentiment")
     tokenizer = AutoTokenizer.from_pretrained(config['pretrained_model'])
-    model = AutoModelForSequenceClassification.from_pretrained(config['pretrained_model'])
+    bert = AutoModel.from_pretrained(config['pretrained_model'])
+    model = BERTClassifier(bert, config)
+    print(model)
     # if config['pretrained_model'].startswith('distilbert'):
     #     tokenizer = DistilBertTokenizer.from_pretrained(config['pretrained_model'])
     #     bert = DistilBertModel.from_pretrained(config['pretrained_model'])
@@ -276,11 +280,16 @@ def run(config):
     train_full_iter = data.BucketIterator(train_full, batch_size=config['bs'], shuffle=True, device=device)
 
     
-    model = AutoModelForSequenceClassification.from_pretrained(config['pretrained_model'])
+    # model = AutoModelForSequenceClassification.from_pretrained("nlptown/bert-base-multilingual-uncased-sentiment")
+    bert = AutoModel.from_pretrained(config['pretrained_model'])
+    model = BERTClassifier(bert, config)
     model.to(device)
+    optimizer = optim.AdamW(model.parameters(), lr=config['bert_lr'])
+    # optimizer = optim.AdamW([{'params': param_bert, 'lr': config['bert_lr']}, {'params': param_gru, 'lr': config['gru_lr']}])
+    criterion = nn.CrossEntropyLoss().to(device)
     model.train()
     
-    for epoch in range(best_epoch + 1):
+    for epoch in range(config['bert_ep']):
         
         start_time = time.time()
         
@@ -290,8 +299,8 @@ def run(config):
             
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
             
-        if epoch == best_epoch:
-            torch.save(model.state_dict(), os.path.join(config['outdir'], f"model_full_{config['pretrained_model']}_bert_lr{config['bert_lr']}_bs{config['bs']}_bert_ep{config['bert_ep']}.pt"))
+        # if epoch == best_epoch:
+            # torch.save(model.state_dict(), os.path.join(config['outdir'], f"model_full_{config['pretrained_model']}_bert_lr{config['bert_lr']}_bs{config['bs']}_bert_ep{config['bert_ep']}.pt"))
         
         print(f'Epoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
         print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')

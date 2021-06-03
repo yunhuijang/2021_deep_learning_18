@@ -53,7 +53,7 @@ export CUDA_VISIBLE_DEVICES=0
 bs=256
 
 model='bert-base-uncased'
-python train.py --gru_ep 10 --gru_lr 1e-4 --bs $bs --pretrained_model $model --gru_only --submitdir './submissions2'
+python train.py --gru_ep 10 --gru_lr 3e-3 --bert_lr 5e-5 --bs $bs --gru_only --pretrained_model $model --submitdir './submissions2'
 # python train.py --gru_ep 10 --gru_lr 1e-3 --bs $bs --pretrained_model $model --gru_only --submitdir './submissions2'
 # python train.py --gru_ep 10 --gru_lr 1e-2 --bs $bs --pretrained_model $model --gru_only --submitdir './submissions2'
 

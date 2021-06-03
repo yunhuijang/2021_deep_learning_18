@@ -66,6 +66,43 @@ class GRUBERT(nn.Module):
 
         return output
 
+class BertPooler(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.dense = nn.Linear(768, 768)
+        self.activation = nn.Tanh()
+
+    def forward(self, hidden_states):
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        first_token_tensor = hidden_states[:, 0]
+        pooled_output = self.dense(first_token_tensor)
+        pooled_output = self.activation(pooled_output)
+        return pooled_output
+
+class BERTClassifier(nn.Module):
+    def __init__(self, bert, config):
+        super().__init__()
+        dic = {'hidden_size':768}
+        self.config = config
+        self.bert = bert
+        self.pooler = BertPooler(config=dic)
+        self.dropout = nn.Dropout(0.1)
+        self.fc = nn.Linear(768, config['out_dim'], bias=True)
+        
+
+
+    def forward(self, text):
+        # text = [batch size, sent len]
+        
+        output = self.bert(text)  # embedding = [batch size, sent len, emb dim]
+        print(output)
+        output = self.pooler(output)
+        output = self.dropout(output)
+        output = self.fc(output)
+
+        return output
+
 class GRUBERT2(nn.Module):
     def __init__(self, bert, embedding_dim, output_dim):
         super().__init__()

@@ -84,7 +84,7 @@ def train_fn(model, iterator, optimizer, criterion):
     epoch_acc = 0
     
     model.train()
-    print(f'TRAIN: The model has {count_parameters(model):,} trainable parameters')
+    # print(f'TRAIN: The model has {count_parameters(model):,} trainable parameters')
 
     for batch in iterator:
         
@@ -114,7 +114,7 @@ def eval_fn(model, iterator, criterion):
     epoch_acc = 0
     
     model.eval()
-    print(f'EVAL: The model has {count_parameters(model):,} trainable parameters')
+    # print(f'EVAL: The model has {count_parameters(model):,} trainable parameters')
     with torch.no_grad():
     
         for batch in iterator:
@@ -186,11 +186,11 @@ def run(config):
     LABEL = data.Field(sequential=False, use_vocab=False)
 
     
-    # train = pd.read_csv(os.path.join(config['datadir'], config['train_data']))
-    # test = pd.read_csv(os.path.join(config['datadir'], config['test_data']))
-    # train, valid = train_test_split(train, test_size=0.2)
-    # train.to_csv(os.path.join(config['datadir'],'temp_train.csv'), index=False)
-    # valid.to_csv(os.path.join(config['datadir'],'temp_val.csv'), index=False)
+    train = pd.read_csv(os.path.join(config['datadir'], config['train_data']))
+    test = pd.read_csv(os.path.join(config['datadir'], config['test_data']))
+    train, valid = train_test_split(train, test_size=0.2)
+    train.to_csv(os.path.join(config['datadir'],'temp_train.csv'), index=False)
+    valid.to_csv(os.path.join(config['datadir'],'temp_val.csv'), index=False)
 
     train, valid = data.TabularDataset.splits(path=config['datadir'], train='temp_train.csv', validation='temp_val.csv', 
                                               format='csv', skip_header=True,
@@ -332,7 +332,7 @@ def run(config):
         optimizer = optim.AdamW([{'params': param_bert, 'lr': config['bert_lr']}, {'params': param_gru, 'lr': config['gru_lr']}])
         criterion = nn.CrossEntropyLoss().to(device)
     
-    for epoch in range(best_epoch + 1):
+    for epoch in range(config['gru_ep']):
         
         start_time = time.time()
         
